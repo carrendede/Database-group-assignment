@@ -1,4 +1,4 @@
- Bookstore Database Management System
+# Bookstore Database Management System
 
 A SQL-based database system for managing bookstore inventory, sales, customers, and orders.
 
@@ -7,8 +7,8 @@ Inventory Management: Track books, authors, and stock levels.
 Customer Records: Store customer details and purchase history.
 Sales Processing: Record orders and generate invoices.
 
-Database Schema
- Key Tables:
+## Database Schema
+### Key Tables:
 1. `Books` (BookID, Title, AuthorID, Price, Stock)
 2. `Authors` (AuthorID, Name)
 3. `Customers` (CustomerID, Name, Email, Address)
