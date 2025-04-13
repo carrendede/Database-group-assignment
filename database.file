@@ -1,0 +1,234 @@
+CREATE DATABASE Bookstore;
+USE bookstore;
+
+-- Language table
+CREATE TABLE book_language (
+   language_id INT PRIMARY KEY AUTO_INCREMENT,
+   language_code CHAR(2) NOT NULL,
+   language_name VARCHAR(50) NOT NULL
+   UNIQUE(language_code)
+-- );
+
+-- Publisher table
+CREATE TABLE publisher (
+    publisher_id INT PRIMARY KEY AUTO_INCREMENT,
+    publisher_name VARCHAR(100) NOT NULL,
+    UNIQUE(publisher_name)
+);
+
+-- Author table
+CREATE TABLE author (
+    author_id INT PRIMARY KEY AUTO_INCREMENT,
+    author_name VARCHAR(100) NOT NULL,
+    UNIQUE(author_name)
+);
+
+-- Country table
+CREATE TABLE country (
+    country_id INT PRIMARY KEY AUTO_INCREMENT,
+    country_name VARCHAR(100) NOT NULL,
+    UNIQUE(country_name)
+);
+
+-- Address status table
+CREATE TABLE address_status (
+    status_id INT PRIMARY KEY AUTO_INCREMENT,
+    address_status VARCHAR(20) NOT NULL,
+     UNIQUE(address_status)
+);
+
+-- Shipping method table
+CREATE TABLE shipping_method (
+    method_id INT PRIMARY KEY AUTO_INCREMENT,
+    method_name VARCHAR(100) NOT NULL,
+    cost DECIMAL(10,2) NOT NULL,
+    UNIQUE(method_name)
+);
+
+-- Order status table
+CREATE TABLE order_status (
+    status_id INT PRIMARY KEY AUTO_INCREMENT,
+    status_value VARCHAR(20) NOT NULL,
+    UNIQUE(status_value)
+);
+
+-- Book table
+CREATE TABLE book (
+    book_id INT AUTO_INCREMENT PRIMARY KEY,
+    title VARCHAR(100) NOT NULL,
+    isbn VARCHAR(13) UNIQUE,
+    publisher_id INT,
+    language_id INT,
+    num_pages INT,
+    publication_date DATE,
+    price DECIMAL(10,2) NOT NULL,
+    stock_quantity INT DEFAULT 0,
+    FOREIGN KEY (publisher_id) REFERENCES publisher(publisher_id),
+    FOREIGN KEY (language_id) REFERENCES book_language(language_id)
+);
+
+-- Book-Author relationship (many-to-many)
+CREATE TABLE book_author (
+    book_id INT NOT NULL,
+    author_id INT NOT NULL,
+    PRIMARY KEY (book_id, author_id),
+    FOREIGN KEY (book_id) REFERENCES book(book_id),
+    FOREIGN KEY (author_id) REFERENCES author(author_id)
+);
+
+-- Customer table
+CREATE TABLE customer (
+    customer_id INT AUTO_INCREMENT PRIMARY KEY,
+    first_name VARCHAR(50) NOT NULL,
+    last_name VARCHAR(50) NOT NULL,
+    email VARCHAR(100) UNIQUE NOT NULL,
+    phone VARCHAR(20),
+    INDEX (last_name, first_name)
+);
+
+-- Address table
+CREATE TABLE address (
+    address_id INT AUTO_INCREMENT PRIMARY KEY,
+    street_number VARCHAR(10) NOT NULL,
+    street_name VARCHAR(100) NOT NULL,
+    city VARCHAR(100) NOT NULL,
+    country_id INT NOT NULL,
+    postal_code VARCHAR(20) NOT NULL,
+    FOREIGN KEY (country_id) REFERENCES country(country_id)
+);
+
+-- Customer-Address relationship (many-to-many with status)
+CREATE TABLE customer_address (
+    customer_id INT NOT NULL,
+    address_id INT NOT NULL,
+    status_id INT NOT NULL,
+    PRIMARY KEY (customer_id, address_id),
+    FOREIGN KEY (customer_id) REFERENCES customer(customer_id),
+    FOREIGN KEY (address_id) REFERENCES address(address_id),
+    FOREIGN KEY (status_id) REFERENCES address_status(status_id)
+);
+
+-- Order table
+CREATE TABLE cust_order (
+   order_id INT AUTO_INCREMENT PRIMARY KEY,
+   order_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+   customer_id INT NOT NULL,
+   shipping_address_id INT NOT NULL,
+   shipping_method_id INT NOT NULL,
+   order_total DECIMAL(12,2) NOT NULL,
+   FOREIGN KEY (customer_id) REFERENCES customer(customer_id),
+   FOREIGN KEY (shipping_address_id) REFERENCES address(address_id),
+   FOREIGN KEY (shipping_method_id) REFERENCES shipping_method(method_id)
+);
+
+-- Order line items
+CREATE TABLE order_line (
+    order_id INT NOT NULL,
+    book_id INT NOT NULL,
+    quantity INT NOT NULL DEFAULT 1,
+    price DECIMAL(10,2) NOT NULL,
+    FOREIGN KEY (order_id) REFERENCES cust_order(order_id),
+    FOREIGN KEY (book_id) REFERENCES book(book_id)
+);
+
+-- Order history tracking
+CREATE TABLE order_history (
+    history_id INT AUTO_INCREMENT PRIMARY KEY,
+    order_id INT NOT NULL,
+    status_id INT NOT NULL,
+    status_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (order_id) REFERENCES cust_order(order_id),
+    FOREIGN KEY (status_id) REFERENCES order_status(status_id)
+);
+
+-- insert languages
+INSERT INTO book_language (language_code, language_name) VALUES
+('EN', 'English'), ('FR', 'French'), ('DE', 'German'), ('IT', 'Italian'), ('JA', 'Japanese');
+
+-- Insert publishers
+INSERT INTO publisher (publisher_name) VALUES 
+('Penguin Random House'), ('HarperCollins'), ('Simon & Schuster');
+
+--  Insert authors
+INSERT INTO author (author_name) VALUES 
+('J.K. Rowling'), ('George Orwell'), ('Toni Morrison');
+
+-- Insert countries
+INSERT INTO country (country_name) VALUES 
+('United States'), ('United Kingdom'), ('France');
+
+-- Insert address statuses
+INSERT INTO address_status (address_status) VALUES 
+('Current'), ('Previous'), ('Billing');
+
+-- Insert shipping methods
+INSERT INTO shipping_method (method_name, cost) VALUES 
+('Standard', 5.99), ('Express', 12.99), ('Overnight', 24.99);
+
+-- Insert order statuses
+INSERT INTO order_status (status_value) VALUES 
+('Pending'), ('Processing'), ('Shipped'), ('Delivered'), ('Cancelled');
+
+SELECT 
+    b.title, 
+    GROUP_CONCAT(a.author_name) AS authors,
+    p.publisher_name,
+    b.price
+FROM book b
+JOIN book_author ba ON b.book_id = ba.book_id
+JOIN author a ON ba.author_id = a.author_id
+JOIN publisher p ON b.publisher_id = p.publisher_id
+GROUP BY b.book_id;
+
+SELECT 
+    c.first_name, 
+    c.last_name,
+    co.order_date,
+    co.order_total,
+    os.status_value AS current_status,
+    sm.method_name AS shipping_method
+FROM cust_order co
+JOIN customer c ON co.customer_id = c.customer_id
+JOIN order_history oh ON co.order_id = oh.order_id
+JOIN order_status os ON oh.status_id = os.status_id
+JOIN shipping_method sm ON co.shipping_method_id = sm.method_id
+WHERE c.customer_id = 1
+ORDER BY oh.status_date DESC;
+
+SELECT 
+    b.title,
+    b.stock_quantity,
+    COUNT(ol.book_id) AS times_ordered,
+    (b.stock_quantity - COUNT(ol.book_id)) AS remaining_stock
+FROM book b
+LEFT JOIN order_line ol ON b.book_id = ol.book_id
+GROUP BY b.book_id
+ORDER BY remaining_stock ASC;
+
+CREATE ROLE 'bookstore_admin', 'bookstore_staff', 'bookstore_analyst';
+GRANT ALL PRIVILEGES ON BookStore.* TO 'bookstore_admin';
+GRANT SELECT, INSERT, UPDATE ON BookStore.customer TO 'bookstore_staff';
+GRANT SELECT, INSERT, UPDATE ON BookStore.cust_order TO 'bookstore_staff';
+GRANT SELECT, INSERT, UPDATE ON BookStore.order_line TO 'bookstore_staff';
+
+GRANT SELECT ON BookStore.* TO 'bookstore_analyst';
+-- Create users
+CREATE USER 'admin'@'localhost' IDENTIFIED BY 'securepassword';
+CREATE USER 'staff'@'localhost' IDENTIFIED BY 'staffpass';
+CREATE USER 'analyst'@'localhost' IDENTIFIED BY 'analystpass';
+
+-- Assign roles
+GRANT 'bookstore_admin' TO 'admin'@'localhost';
+GRANT 'bookstore_staff' TO 'staff'@'localhost';
+GRANT 'bookstore_analyst' TO 'analyst'@'localhost';
+
+
+
+
+
+
+
+
+
+
+
